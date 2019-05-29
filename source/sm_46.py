@@ -381,27 +381,43 @@ def create_custom_colormap():
         value_rgb_pairs.append((value,color))
 
     return LinearSegmentedColormap.from_list(name="custom", colors=value_rgb_pairs, N=16)
-def plot_symmetry(im, msm, vor, bond_order, mlf, symmetry_colormap, mask, no_fill, map_edge_particles):
-    
+def plot_symmetry(im, msm, vor, radii,bond_order, mlf, symmetry_colormap, mask, no_fill, map_edge_particles,area):
+
     cell_patches = []
     metric_list = []
     orientation_angle_list = []
     i=0
+    count_4, count_6 = 0.0,0.0
+
     for region_index,metric,orientation_angle in msm:
         plot_this_cell = 0
         region_index = int(region_index)
         region = vor.regions[region_index]
         verts = np.asarray([vor.vertices[index] for index in region])
-        
+
+        x_center = int(round(np.mean(verts[:,1])))
+        y_center = int(round(np.mean(verts[:,0])))
+
+
         # don't plot cells inside masked off regions of the image (blank patches)
         int_verts = np.asarray(verts,dtype='i4')
         if map_edge_particles:
             if np.any(mask[int_verts[:,1],int_verts[:,0]] == 1):
                 plot_this_cell = 1
+        if area:    
+            if np.all(mask[int_verts[:,1],int_verts[:,0]] > 0):
+                temp_cen = np.asarray([np.sqrt(np.abs(b-x_center)**2 + np.abs(a-y_center)**2) for a,b in int_verts])
+                if np.mean(temp_cen) < np.mean(radii)*pixels_per_nm*1.6:
+                    # print('out')
+                    # print x_center,y_center
+                    plot_this_cell = 0 
+                else:
+                    plot_this_cell = 1
         else:
             if np.all(mask[int_verts[:,1],int_verts[:,0]] > 0):
                 plot_this_cell = 1
-                
+
+
         if plot_this_cell:
             if no_fill:
                 cell_patches.append(Polygon(verts,closed=True,facecolor='none',edgecolor='r'))
@@ -410,26 +426,24 @@ def plot_symmetry(im, msm, vor, bond_order, mlf, symmetry_colormap, mask, no_fil
             metric_list.append(mlf[i])
         i=i+1    
 
-
-	count_4, count_6 = 0.0,0.0
-
-    for e in metric_list:
-        if e> 0.5:
-            count_4 +=1
-        if e<-0.5:
-            count_6 +=1
-
-    ratio_46 = round(count_4/(count_4+count_6),3)
-    ratio_4t = round(count_4/(len(metric_list)),3)
-    ratio_6t = round(count_6/(len(metric_list)),3)
-    print(count_4,count_6, ratio_46, ratio_4t, ratio_6t)
-
                     
     if no_fill:
         pc = PatchCollection(cell_patches,match_original=True,alpha=0.4)
     else:
         pc = PatchCollection(cell_patches,match_original=False, cmap=symmetry_colormap, edgecolor='k', alpha=1)
         pc.set_array(np.asarray(metric_list))
+
+    for e in metric_list:
+        if e> 0.5:
+            count_4 +=1
+        if e<-0.5:
+            count_6 +=1
+    ratio_46 = round(count_4/(count_4+count_6),3)
+    ratio_4t = round(count_4/(len(metric_list)),3)
+    ratio_6t = round(count_6/(len(metric_list)),3)
+    print("symmetry4:",count_4,"symmetry6:", count_6,"ratio_46:", ratio_46,"ratio_4total:", ratio_4t,"ratio_6total:", ratio_6t)
+
+
         
     plt.gca().add_collection(pc)
 
@@ -464,79 +478,6 @@ def plot_symmetry(im, msm, vor, bond_order, mlf, symmetry_colormap, mask, no_fil
     # plt.ylabel('Count')
     # plt.savefig(output_data_path+'/'+filename+'_Psi'+str(bond_order)+'_hist.png', bbox_inches='tight')
     
-def plot_orientation(im, msm, vor, pts, radii, pixels_per_nm, orientation_colormap, mask, map_edge_particles):
-
-    # set to 1 to plot a vector map instead of colormap
-    vector_map = 0
-
-    cell_patches = []
-    arrow_patches = []
-    orientation_angle_list = []
-    mean_radius = np.mean(radii)
-    for region_index,metric,orientation_angle in msm:
-        plot_this_cell = 0
-        region = vor.regions[region_index]
-        verts = np.asarray([vor.vertices[index] for index in region])
-
-        # don't plot cells inside masked off regions of the image (blank patches)
-        int_verts = np.asarray(verts,dtype='i4')
-        if map_edge_particles:
-            if np.any(mask[int_verts[:,1],int_verts[:,0]] == 1):
-                plot_this_cell = 1
-        else:
-            if np.all(mask[int_verts[:,1],int_verts[:,0]] > 0):
-                plot_this_cell = 1
-
-        if plot_this_cell:
-            if vector_map:
-                x = np.mean(int_verts[:,0])
-                y = np.mean(int_verts[:,1])
-                dx = mean_radius*np.cos(np.pi/180.0 * orientation_angle)
-                dy = mean_radius*np.sin(np.pi/180.0 * orientation_angle)
-                arrow_patches.append(Arrow(x,y,dx,dy,facecolor='none',edgecolor='r'))
-                cell_patches.append(Polygon(verts,closed=True,facecolor='none',edgecolor='k'))
-            else:
-                cell_patches.append(Polygon(verts,closed=True,edgecolor='none'))
-
-                # This works for centrosymmetric cells (hexagon, square, not triangles)
-                # give cells with +/- 180 deg. orientation angles the same color
-                if orientation_angle < 0:
-                    orientation_angle += 180.0
-
-                if orientation_angle > 90:
-                    orientation_angle = np.abs(orientation_angle-180.0)
-
-                orientation_angle_list.append(orientation_angle)
-
-    if vector_map:
-        arrow_collection = PatchCollection(arrow_patches,match_original=True, cmap=orientation_colormap, alpha=1)
-        cell_collection = PatchCollection(cell_patches,match_original=True, alpha=1)
-        plt.gca().add_collection(arrow_collection)
-    else:
-        cell_collection = PatchCollection(cell_patches,match_original=False,cmap=orientation_colormap,edgecolor='k', alpha=1)
-        cell_collection.set_array(np.asarray(orientation_angle_list))
-
-    plt.gca().add_collection(cell_collection)
-
-    # set the limits for the plot
-    # set the x axis range
-    plt.gca().set_xlim(0, im.shape[1])
-
-    # set the y-axis range and flip the y-axis
-    plt.gca().set_ylim(im.shape[0], 0)
-
-    # save this plot to a file
-    plt.gca().set_axis_off()
-
-    # add the colorbar
-    divider = make_axes_locatable(plt.gca())
-    cax = divider.append_axes(position='right', size='5%', pad = 0.05)
-    cbar = plt.colorbar(cell_collection, cax=cax)
-    cax.set_xlabel('$\Theta$ (deg)', fontsize=18)
-    cax.xaxis.set_label_position('top')
-    cax.xaxis.set_label_coords(0.5, 1.04)
-
-    # plt.savefig(output_data_path+'/'+filename+'_orientation_map.png',bbox_inches='tight',dpi=300)
 
 def plot_particle_outlines(im, pts, radii, pixels_per_nm):
     
@@ -560,71 +501,15 @@ def plot_particle_outlines(im, pts, radii, pixels_per_nm):
     
     # plt.savefig(output_data_path+'/'+filename+'_particle_map.png',bbox_inches='tight',dpi=300)
 
-def plot_bonds(im,line_segments,bond_list):
-
-    # add the TEM image as the background
-    implot = plt.imshow(im)
-    implot.set_cmap('gray')
-
-    bond_color_map = create_custom_colormap()
-
-    lc = LineCollection(line_segments,cmap=bond_color_map)
-    lc.set_array(np.asarray(bond_list))
-    lc.set_linewidth(1)
-    plt.gca().add_collection(lc)
-    bond_color_bar = plt.colorbar(lc)
-
-    # set the x axis range
-    plt.gca().set_xlim(0, im.shape[1])
-
-    # set the y-axis range and flip the y-axis
-    plt.gca().set_ylim(im.shape[0], 0)
-
-    bond_color_bar.ax.set_ylabel('Connection Width (nm)')
-    plt.gca().set_axis_off()
-
-def plot_nn_distance(im,line_segments,nn_distance_list):
-
-    nn_dist_cmap = plt.get_cmap('RdBu_r')
-
-    # show the background image
-    implot = plt.imshow(im)
-    implot.set_cmap('gray')
-
-    nn_lc = LineCollection(line_segments,cmap=nn_dist_cmap)
-    nn_lc.set_array(np.asarray(nn_distance_list))
-    nn_lc.set_linewidth(1)
-    plt.gca().add_collection(nn_lc)
-    nn_color_bar = plt.colorbar(nn_lc)
-    nn_color_bar.ax.set_ylabel('NN Dist. (nm)')
-    plt.gca().set_axis_off()
-    plt.gca().set_title('Neighbor Distance')
-
-def gaussian(x, amp, mean, std):
-    return amp/(np.sqrt(2.0*np.pi)*std)*np.exp(-(x-mean)**2/(2.0*std**2))
-
-def square(x, amp, center, width):
-    amp = 0.6
-    out = np.zeros(len(x))
-    peaks = np.linspace(center-width,center+width,10)
-    for peak in peaks:
-        out += gaussian(x,amp*np.sqrt(2.0*np.pi)*width/10,peak,width/10)
-
-    return out
-
-
-
-
-
-
-
-
 #  Main code
 
    
-im = skimio.imread('filename',as_grey=True,plugin='matplotlib')
+im = skimio.imread('/users/jenyu/DOLFIN/C3 DOLFIN_11.tif',as_grey=True,plugin='matplotlib')
 im_original = np.empty_like(im)
 np.copyto(im_original,im)
+
+# output_data_path = path.dirname('')
+# filename = str.split(path.basename(''),'.')[0]
 
 background = 1
 
@@ -634,7 +519,7 @@ if background:
 else:
     im[bar_corners[0][0]:bar_corners[1][0]+1,bar_corners[0][1]:bar_corners[1][1]+1] = 0
 
-pts, radii, mask, binary = get_particle_centers(im,background,pixels_per_nm,1,0)
+pts, radii, mask, binary = get_particle_centers(im,background,pixels_per_nm,1,0) #mor,smnall
 assert len(pts) == len(radii)
 
 
@@ -661,7 +546,7 @@ for i in range(len(metric_list4)):
 
 
 
-
+#plot outline
 
 # plt.figure(1)
 # plt.subplot(111)
@@ -670,12 +555,24 @@ for i in range(len(metric_list4)):
 # plot_particle_outlines(im, pts, radii, pixels_per_nm)
 # plt.show()
 
-plt.figure(1)
+#plot binary
+
+# plt.figure(1)
+# plt.subplot(111)
+# implot = plt.imshow(mask)
+# plt.show()
+
+
+plt.figure()
 plt.clf()
 plt.subplot(111)
 implot = plt.imshow(im_original)
 implot.set_cmap('gray')
 symmetry_colormap = plt.get_cmap('RdBu_r')
-plot_symmetry(im, msm, vor, 4, metric_list_final, symmetry_colormap, mask,0, 0)
+plot_symmetry(im, msm, vor,radii, 4, metric_list_final, symmetry_colormap, mask,0, 0,1) #no fill, edge, areafilter(need to set the value)
 plt.show()
+
+
+
+# plt.savefig(output_data_path+'/'+filename+'_Psi'+str(bond_order)+'_map.png',bbox_inches='tight',dpi=300)
     
