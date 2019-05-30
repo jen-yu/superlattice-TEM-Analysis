@@ -18,10 +18,13 @@
 1. Edge (plot edge cell or not)
 
 ## Optimization steps 
- First: Tune the min_feature_size to match the particle size 
- Second: Suggested to use morphology
- Third: If weird voronoi cell appears, use areafilter 
- Forth: Play with small and edge 
+First: Tune the min_feature_size to match the particle size 
+ 
+Second: Suggested to use morphology
+
+Third: If weird voronoi cell appears, use areafilter 
+
+Forth: Play with small and edge 
  
  
 
