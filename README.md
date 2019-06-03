@@ -29,7 +29,9 @@ Second: Suggested to use morphology
 Third: If weird voronoi cell appears, use areafilter 
 
 Forth: Play with small and edge 
- 
+
+# Source
+Whitham, K. Structure and Electronic Properties of Lead Selenide Nanocrystal Solids; Cornell University, 2016.
  
 
 
