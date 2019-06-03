@@ -4,6 +4,7 @@
 
 # Intro 
 * Run sm_46.py to get symmetry map
+* Run structure_metric.py to get complete analysis
 
 # General logic 
 1. Read file 
