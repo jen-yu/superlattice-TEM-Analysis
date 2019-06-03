@@ -504,7 +504,7 @@ def plot_particle_outlines(im, pts, radii, pixels_per_nm):
 #  Main code
 
    
-im = skimio.imread('/users/jenyu/DOLFIN/C3 DOLFIN_11.tif',as_grey=True,plugin='matplotlib')
+im = skimio.imread('PATH of FILE',as_grey=True,plugin='matplotlib')
 im_original = np.empty_like(im)
 np.copyto(im_original,im)
 
